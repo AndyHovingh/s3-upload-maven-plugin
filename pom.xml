@@ -4,12 +4,12 @@
   <parent>
     <groupId>com.bazaarvoice.commons</groupId>
     <artifactId>bv-opensource-super-pom</artifactId>
-    <version>1.4</version>
+    <version>1.8</version>
   </parent>
 
   <groupId>com.bazaarvoice.maven.plugins</groupId>
   <artifactId>s3-upload-maven-plugin</artifactId>
-  <version>1.5-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>S3 upload maven plugin</name>
@@ -22,22 +22,61 @@
   </scm>
 
   <properties>
-    <maven.compiler.source>1.6</maven.compiler.source>
-    <maven.compiler.target>1.6</maven.compiler.target>
+    <java.minimum.version>1.8</java.minimum.version>
+    <maven.compiler.source>1.7</maven.compiler.source>
+    <maven.compiler.target>1.7</maven.compiler.target>
     <encoding>UTF-8</encoding>
+
+    <jackson.version>2.10.1</jackson.version>
+    <jackson-databind.version>2.10.1</jackson-databind.version>
+    <jackson.dataformat.cbor.version>2.10.1</jackson.dataformat.cbor.version>
+    <target.maven.version>3.3.9</target.maven.version>
+    <versions.maven.plugin.version>2.7</versions.maven.plugin.version>
   </properties>
 
   <build>
     <plugins>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
+        <artifactId>versions-maven-plugin</artifactId>
+        <version>2.7</version>
+        <configuration>
+          <rulesUri>file://${project.basedir}/src/main/maven-versions-plugin/rules.xml</rulesUri>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>1.4.1</version>
+        <executions>
+          <execution>
+            <id>enforce-versions</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireMavenVersion>
+                  <version>3.6.2</version>
+                </requireMavenVersion>
+                <requireJavaVersion>
+                  <version>${java.minimum.version}</version>
+                </requireJavaVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
         <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <version>1.15</version>
+        <version>1.18</version>
         <configuration>
           <signature>
             <groupId>org.codehaus.mojo.signature</groupId>
-            <artifactId>java16</artifactId>
-            <version>1.1</version>
+            <artifactId>java17</artifactId>
+            <version>1.0</version>
           </signature>
         </configuration>
         <executions>
@@ -52,7 +91,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-plugin-plugin</artifactId>
-        <version>3.4</version>
+        <version>3.6.0</version>
         <configuration>
           <skipErrorNoDescriptorsFound>true</skipErrorNoDescriptorsFound>
         </configuration>
@@ -73,9 +112,46 @@
         </executions>
       </plugin>
       <plugin>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.1.1</version>
+        <executions>
+          <execution>
+            <id>analyze</id>
+            <goals>
+              <goal>analyze-only</goal>
+            </goals>
+            <configuration>
+              <failOnWarning>true</failOnWarning>
+              <ignoredUnusedDeclaredDependencies>
+                <ignoredUnusedDeclaredDependency>com.amazonaws:aws-java-sdk-sts</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.core:jackson-annotations</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.core:jackson-core</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.dataformat:jackson-dataformat-cbor</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.core:jackson-databind</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>5.2.3</version>
+        <configuration>
+          <failBuildOnCVSS>1</failBuildOnCVSS>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.sonatype.plugins</groupId>
         <artifactId>nexus-staging-maven-plugin</artifactId>
-        <version>1.6.7</version>
+        <version>1.6.8</version>
         <extensions>true</extensions>
         <configuration>
           <serverId>sonatype-nexus-staging</serverId>
@@ -83,14 +159,44 @@
           <autoReleaseAfterClose>true</autoReleaseAfterClose>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>2.5.2</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-site-plugin</artifactId>
+        <version>3.8.2</version>
+      </plugin>
     </plugins>
   </build>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <!-- using AWS SDK V1 for S3 instead of V2 (software.amazon.awssdk:s3)
+        because AWS SDK V2 for Java does not appear to have
+        a way to track S3 upload/download progress at
+        the time of writing this. They are features not yet in 2.X:
+        https://docs.aws.amazon.com/sdk-for-java/v2/developer-guide/welcome.html
+        (Transfer Manager) https://github.com/aws/aws-sdk-java-v2/issues/37
+        (Progress Listeners) https://github.com/aws/aws-sdk-java-v2/issues/25
+        -->
+        <groupId>com.amazonaws</groupId>
+        <artifactId>aws-java-sdk-bom</artifactId>
+        <version>1.11.671</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-plugin-api</artifactId>
-      <version>3.3.9</version>
+      <version>${target.maven.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.plugin-tools</groupId>
@@ -102,18 +208,37 @@
     <dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-core</artifactId>
-      <version>1.10.69</version>
     </dependency>
     <dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-s3</artifactId>
-      <version>1.10.69</version>
     </dependency>
     <dependency>
       <!-- The STS SDK is necessary if role based profiles are used for credentials. -->
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-sts</artifactId>
-      <version>1.10.69</version>
+    </dependency>
+
+    <!-- jackson upgrade necessary due to many security vulnerabilities detected in version 2.6.7.3 -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-cbor</artifactId>
+      <version>${jackson.dataformat.cbor.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson-databind.version}</version>
     </dependency>
   </dependencies>
 </project>

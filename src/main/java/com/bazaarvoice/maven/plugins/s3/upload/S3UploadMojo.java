@@ -1,12 +1,14 @@
 package com.bazaarvoice.maven.plugins.s3.upload;
 
 import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
-import com.amazonaws.internal.StaticCredentialsProvider;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.regions.DefaultAwsRegionProviderChain;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.Headers;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -16,6 +18,7 @@ import com.amazonaws.services.s3.transfer.Transfer;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
@@ -24,6 +27,139 @@ import java.io.File;
 @Mojo(name = "s3-upload")
 public class S3UploadMojo extends AbstractMojo
 {
+  public static class S3Provider
+  {
+    private final AmazonS3ClientBuilder builder;
+
+    S3Provider()
+    {
+      this(AmazonS3Client.builder());
+    }
+
+    S3Provider(final AmazonS3ClientBuilder builder)
+    {
+      this.builder = builder;
+    }
+
+    public AmazonS3 getS3(
+            final AWSCredentials credentialsMaybe,
+            final String endpointMaybe
+    )
+    {
+      builder.setCredentials(
+              credentialsMaybe == null
+              ? new DefaultAWSCredentialsProviderChain()
+              : new AWSStaticCredentialsProvider(credentialsMaybe)
+      );
+      if (endpointMaybe != null) {
+        builder.setEndpointConfiguration(
+                new AwsClientBuilder.EndpointConfiguration(
+                        endpointMaybe,
+                        new DefaultAwsRegionProviderChain().getRegion()
+                )
+        );
+      }
+      return builder.build();
+    }
+  }
+
+  public static class Builder
+  {
+    private String accessKey;
+    private String secretKey;
+    private boolean doNotUpload;
+    private File source;
+    private String bucketName;
+    private String destination;
+    private String endpoint;
+    private boolean recursive;
+    private S3Provider s3Provider;
+    private Log log;
+
+    public Builder withAccessKey(final String accessKey)
+    {
+      this.accessKey = accessKey;
+      return this;
+    }
+
+    public Builder withSecretKey(final String secretKey)
+    {
+      this.secretKey = secretKey;
+      return this;
+    }
+
+    public Builder withDoNotUpload(final Boolean doNotUpload)
+    {
+      this.doNotUpload = doNotUpload;
+      return this;
+    }
+
+    public Builder withSource(final File source)
+    {
+      this.source = source;
+      return this;
+    }
+
+    public Builder withBucketName(final String bucketName)
+    {
+      this.bucketName = bucketName;
+      return this;
+    }
+
+    public Builder withDestination(final String destination)
+    {
+      this.destination = destination;
+      return this;
+    }
+
+    public Builder withEndpoint(final String endpoint)
+    {
+      this.endpoint = endpoint;
+      return this;
+    }
+
+    public Builder withRecursive(final Boolean recursive)
+    {
+      this.recursive = recursive;
+      return this;
+    }
+
+    public Builder withLog(final Log log)
+    {
+      this.log = log;
+      return this;
+    }
+
+    public Builder withS3Provider(final S3Provider s3Provider)
+    {
+      this.s3Provider = s3Provider;
+      return this;
+    }
+
+    public S3UploadMojo build()
+    {
+      return new S3UploadMojo(this);
+    }
+  }
+
+  /** no-arg constructor for Maven */
+  @SuppressWarnings("unused")
+  public S3UploadMojo() {}
+
+  private S3UploadMojo(final Builder builder)
+  {
+    accessKey = builder.accessKey;
+    secretKey = builder.secretKey;
+    doNotUpload = builder.doNotUpload;
+    source = builder.source;
+    bucketName = builder.bucketName;
+    destination = builder.destination;
+    endpoint = builder.endpoint;
+    recursive = builder.recursive;
+    setLog(builder.log);
+    s3Provider = builder.s3Provider;
+  }
+
   /** Access key for S3. */
   @Parameter(property = "s3-upload.accessKey")
   private String accessKey;
@@ -59,6 +195,8 @@ public class S3UploadMojo extends AbstractMojo
   @Parameter(property = "s3-upload.recursive", defaultValue = "false")
   private boolean recursive;
 
+  private S3Provider s3Provider = new S3Provider();
+
   @Override
   public void execute() throws MojoExecutionException
   {
@@ -66,10 +204,12 @@ public class S3UploadMojo extends AbstractMojo
       throw new MojoExecutionException("File/folder doesn't exist: " + source);
     }
 
-    AmazonS3 s3 = getS3Client(accessKey, secretKey);
-    if (endpoint != null) {
-      s3.setEndpoint(endpoint);
-    }
+    final AmazonS3 s3 = s3Provider.getS3(
+            accessKey != null && secretKey != null
+              ? new BasicAWSCredentials(accessKey, secretKey)
+              : null,
+            endpoint
+    );
 
     if (!s3.doesBucketExist(bucketName)) {
       throw new MojoExecutionException("Bucket doesn't exist: " + bucketName);
@@ -82,7 +222,7 @@ public class S3UploadMojo extends AbstractMojo
       return;
     }
 
-    boolean success = upload(s3, source);
+    final boolean success = upload(s3, source);
     if (!success) {
       throw new MojoExecutionException("Unable to upload file to S3.");
     }
@@ -91,24 +231,14 @@ public class S3UploadMojo extends AbstractMojo
             source, bucketName, destination));
   }
 
-  private static AmazonS3 getS3Client(String accessKey, String secretKey)
+  private boolean upload(
+          final AmazonS3 s3,
+          final File sourceFile
+  ) throws MojoExecutionException
   {
-    AWSCredentialsProvider provider;
-    if (accessKey != null && secretKey != null) {
-      AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
-      provider = new StaticCredentialsProvider(credentials);
-    } else {
-      provider = new DefaultAWSCredentialsProviderChain();
-    }
+    final TransferManager mgr = new TransferManager(s3);
 
-    return new AmazonS3Client(provider);
-  }
-
-  private boolean upload(AmazonS3 s3, File sourceFile) throws MojoExecutionException
-  {
-    TransferManager mgr = new TransferManager(s3);
-
-    Transfer transfer;
+    final Transfer transfer;
     if (sourceFile.isFile()) {
       transfer = mgr.upload(new PutObjectRequest(bucketName, destination, sourceFile)
               .withCannedAcl(CannedAccessControlList.BucketOwnerFullControl));

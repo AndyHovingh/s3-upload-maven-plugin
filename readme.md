@@ -2,6 +2,11 @@ s3-upload-maven-plugin
 ======================
 Uploads a file or (recursively) the contents of a directory to S3.
 
+Minimum Requirements
+------------------------
+Java Version: 7+
+Maven Version: 3.3.9+
+
 Configuration parameters
 ------------------------
 
@@ -28,7 +33,7 @@ Example: Upload a file
     <plugin>
       <groupId>com.bazaarvoice.maven.plugins</groupId>
       <artifactId>s3-upload-maven-plugin</artifactId>
-      <version>1.4</version>
+      <version>1.5.0</version>
       <configuration>
         <bucketName>my-s3-bucket</bucketName>
         <source>dir/filename.txt</source>
@@ -51,7 +56,7 @@ Example: Recursively upload a folder
     <plugin>
       <groupId>com.bazaarvoice.maven.plugins</groupId>
       <artifactId>s3-upload-maven-plugin</artifactId>
-      <version>1.4</version>
+      <version>1.5.0</version>
       <configuration>
         <bucketName>my-s3-bucket</bucketName>
         <source>dir</source>
@@ -66,8 +71,28 @@ Example: Recursively upload a folder
 Plugin Development
 ------------------------
 
+## Minimum Development Requirements
+
+Java Version: 8+
+Maven Version: 3.6.2+
+[Docker](https://www.docker.com/) (used during integration testing)
+
 #### check dependencies are up-to-date
 
 ```bash
 $ mvn versions:display-dependency-updates versions:display-plugin-updates
 ```
+
+## Changelog
+
+Please see [Release Notes](https://github.com/bazaarvoice/s3-upload-maven-plugin/releases) for a list of changes.
+
+## Releases
+
+We follow semantic versioning policy as of version 1.5.0 ([semver.org](http://semver.org/)):
+
+> Given a version number MAJOR.MINOR.PATCH, increment the:
+>
+>MAJOR version when you make incompatible API changes,<br/>
+>MINOR version when you add functionality in a backwards-compatible manner, and<br/>
+>PATCH version when you make backwards-compatible bug fixes.

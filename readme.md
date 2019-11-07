@@ -63,3 +63,11 @@ Example: Recursively upload a folder
 </build>
 ```
 
+Plugin Development
+------------------------
+
+#### check dependencies are up-to-date
+
+```bash
+$ mvn versions:display-dependency-updates versions:display-plugin-updates
+```

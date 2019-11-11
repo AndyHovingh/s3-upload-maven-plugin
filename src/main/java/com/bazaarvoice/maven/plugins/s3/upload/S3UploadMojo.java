@@ -1,9 +1,11 @@
 package com.bazaarvoice.maven.plugins.s3.upload;
 
 import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.regions.DefaultAwsRegionProviderChain;
 import com.amazonaws.services.s3.AmazonS3;
@@ -44,19 +46,32 @@ public class S3UploadMojo extends AbstractMojo
 
     public AmazonS3 getS3(
             final AWSCredentials credentialsMaybe,
-            final String endpointMaybe
+            final String endpointMaybe,
+            final String regionMaybe,
+            final String profileMaybe
     )
     {
-      builder.setCredentials(
-              credentialsMaybe == null
-              ? new DefaultAWSCredentialsProviderChain()
-              : new AWSStaticCredentialsProvider(credentialsMaybe)
-      );
+      final AWSCredentialsProvider credentials;
+      if (credentialsMaybe != null) {
+        credentials = new AWSStaticCredentialsProvider(credentialsMaybe);
+      } else if (profileMaybe != null) {
+        credentials = new ProfileCredentialsProvider(profileMaybe);
+      } else {
+        credentials = new DefaultAWSCredentialsProviderChain();
+      }
+      builder.setCredentials(credentials);
+
+      if (regionMaybe != null) {
+        builder.setRegion(regionMaybe);
+      }
+
       if (endpointMaybe != null) {
         builder.setEndpointConfiguration(
                 new AwsClientBuilder.EndpointConfiguration(
                         endpointMaybe,
-                        new DefaultAwsRegionProviderChain().getRegion()
+                        regionMaybe == null
+                          ? new DefaultAwsRegionProviderChain().getRegion()
+                          : regionMaybe
                 )
         );
       }
@@ -73,6 +88,8 @@ public class S3UploadMojo extends AbstractMojo
     private String bucketName;
     private String destination;
     private String endpoint;
+    private String region;
+    private String profile;
     private boolean recursive;
     private S3Provider s3Provider;
     private Log log;
@@ -119,6 +136,18 @@ public class S3UploadMojo extends AbstractMojo
       return this;
     }
 
+    public Builder withRegion(final String region)
+    {
+      this.region = region;
+      return this;
+    }
+
+    public Builder withProfile(final String profile)
+    {
+      this.profile = profile;
+      return this;
+    }
+
     public Builder withRecursive(final Boolean recursive)
     {
       this.recursive = recursive;
@@ -156,6 +185,8 @@ public class S3UploadMojo extends AbstractMojo
     bucketName = builder.bucketName;
     destination = builder.destination;
     endpoint = builder.endpoint;
+    region = builder.region;
+    profile = builder.profile;
     recursive = builder.recursive;
     setLog(builder.log);
     s3Provider = builder.s3Provider;
@@ -192,6 +223,14 @@ public class S3UploadMojo extends AbstractMojo
   @Parameter(property = "s3-upload.endpoint")
   private String endpoint;
 
+  /** Region of the destination bucket */
+  @Parameter(property = "s3-upload.region")
+  private String region;
+
+  /** AWS Profile to get credentials */
+  @Parameter(property = "s3-upload.profile")
+  private String profile;
+
   /** In the case of a directory upload, recursively upload the contents. */
   @Parameter(property = "s3-upload.recursive", defaultValue = "false")
   private boolean recursive;
@@ -209,7 +248,9 @@ public class S3UploadMojo extends AbstractMojo
             accessKey != null && secretKey != null
               ? new BasicAWSCredentials(accessKey, secretKey)
               : null,
-            endpoint
+            endpoint,
+            region,
+            profile
     );
 
     if (!s3.doesBucketExistV2(bucketName)) {

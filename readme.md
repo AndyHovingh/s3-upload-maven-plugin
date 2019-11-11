@@ -16,10 +16,12 @@ Configuration parameters
 |source|The source file or folder (was sourceFile before 1.2)|*yes*| |
 |destination|The destination file or destination folder (was destinationFile before 1.2)| *yes*| |
 |recursive|If this is a directory copy, recursively copy all contents (since 1.2)| *no* | false |
-|accessKey|S3 access key | *no* | if unspecified, uses the Default Provider, falling back to env variables |
-|secretKey|S3 secret key | *no* | if unspecified, uses the Default Provider, falling back to env variables |
+|accessKey|S3 access key. If provided this overrides profile. | *no* | if unspecified, uses the Default Provider, falling back to env variables |
+|secretKey|S3 secret key. If provided this overrides profile. | *no* | if unspecified, uses the Default Provider, falling back to env variables |
 |doNotUpload|Dry run| *no* | false |
 |endpoint|Use a different s3 endpoint| *no* | s3.amazonaws.com |
+|region|AWS region of the bucket (since 1.5.0)| *no* | if unspecified, uses the Default Provider, falling back to env variables |
+|profile|AWS profile. Credentials are overridden by accessKey and secretKey if provided. (since 1.5.0)| *no* | if unspecified, uses the Default Provider for credentials, falling back to env variables |
 
 Example: Upload a file
 ----------------------

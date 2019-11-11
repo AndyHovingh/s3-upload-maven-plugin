@@ -16,7 +16,10 @@ import org.mockito.Mockito;
 import java.io.File;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 public class S3UploadMojoTest
 {
@@ -28,6 +31,19 @@ public class S3UploadMojoTest
             "DIFFERENT_ACCESS_KEY_ID",
             "DIFFERENT_SECRET_KEY"
     );
+
+    // test-profile is defined in src/test/resources/test_credentials.txt
+    // and the surefire plugin in the pom.xml is configured to set the
+    // environment variable AWS_CREDENTIAL_PROFILES_FILE to that file path for
+    // the AWS Java SDK.
+    private static final AWSCredentials PROFILE_CREDENTIALS = new BasicAWSCredentials(
+            "PROFILE_ACCESS_KEY_ID",
+            "PROFILE_SECRET_KEY"
+    );
+    private static final String PROFILE = "test-profile";
+
+    private static final String REGION = "us-east-1";
+    private static final String DIFFERENT_REGION = "eu-west-1";
     private static final File FILE = new File("src/test/resources/file.txt");
     private static final String BUCKET = "test-bucket";
     private static final String DESTINATION_KEY = "unit-test-destination/key";
@@ -90,6 +106,108 @@ public class S3UploadMojoTest
                 CREDENTIALS.getAWSSecretKey(),
                 appliedCredentials.getAWSSecretKey(),
                 "The secret key was not applied."
+        );
+    }
+
+    @Test
+    void itSupportsProfileProvidedCredentials() throws MojoExecutionException
+    {
+        // test-profile is defined in src/test/resources/test_credentials.txt
+        // and the surefire plugin in the pom.xml is configured to set the
+        // environment variable AWS_CREDENTIAL_PROFILES_FILE to that file path for
+        // the AWS Java SDK.
+
+        System.setProperty(
+                SDKGlobalConfiguration.ACCESS_KEY_SYSTEM_PROPERTY,
+                DIFFERENT_CREDENTIALS.getAWSAccessKeyId()
+        );
+        System.setProperty(
+                SDKGlobalConfiguration.SECRET_KEY_SYSTEM_PROPERTY,
+                DIFFERENT_CREDENTIALS.getAWSSecretKey()
+        );
+
+        final AmazonS3ClientBuilder spyS3Builder = spy(AmazonS3ClientBuilder.class);
+
+        final S3UploadMojo mojo = mojoBuilder(spyS3Builder)
+                .withSource(FILE)
+                .withBucketName(BUCKET)
+                .withDestination(DESTINATION_KEY)
+                .withProfile(PROFILE)
+                .build();
+
+        mojo.execute();
+
+        final AWSCredentials appliedCredentials = spyS3Builder.getCredentials().getCredentials();
+        assertEquals(
+                PROFILE_CREDENTIALS.getAWSAccessKeyId(),
+                appliedCredentials.getAWSAccessKeyId(),
+                "The access key id was not applied."
+        );
+        assertEquals(
+                PROFILE_CREDENTIALS.getAWSSecretKey(),
+                appliedCredentials.getAWSSecretKey(),
+                "The secret key was not applied."
+        );
+    }
+
+    @Test
+    void explicitlyProvidedCredentialsOverrideProfile() throws MojoExecutionException
+    {
+        System.setProperty(
+                SDKGlobalConfiguration.ACCESS_KEY_SYSTEM_PROPERTY,
+                DIFFERENT_CREDENTIALS.getAWSAccessKeyId()
+        );
+        System.setProperty(
+                SDKGlobalConfiguration.SECRET_KEY_SYSTEM_PROPERTY,
+                DIFFERENT_CREDENTIALS.getAWSSecretKey()
+        );
+
+        final AmazonS3ClientBuilder spyS3Builder = spy(AmazonS3ClientBuilder.class);
+
+        final S3UploadMojo mojo = mojoBuilder(spyS3Builder)
+                .withAccessKey(CREDENTIALS.getAWSAccessKeyId())
+                .withSecretKey(CREDENTIALS.getAWSSecretKey())
+                .withProfile(PROFILE)
+                .withSource(FILE)
+                .withBucketName(BUCKET)
+                .withDestination(DESTINATION_KEY)
+                .build();
+
+        mojo.execute();
+
+        final AWSCredentials appliedCredentials = spyS3Builder.getCredentials().getCredentials();
+        assertEquals(
+                CREDENTIALS.getAWSAccessKeyId(),
+                appliedCredentials.getAWSAccessKeyId(),
+                "The access key id was not applied."
+        );
+        assertEquals(
+                CREDENTIALS.getAWSSecretKey(),
+                appliedCredentials.getAWSSecretKey(),
+                "The secret key was not applied."
+        );
+    }
+
+    @Test
+    void itAppliesExplicitlyProvidedRegion() throws MojoExecutionException
+    {
+        System.setProperty(SDKGlobalConfiguration.AWS_REGION_SYSTEM_PROPERTY, DIFFERENT_REGION);
+
+        final AmazonS3ClientBuilder spyS3Builder = spy(AmazonS3ClientBuilder.class);
+
+        final S3UploadMojo mojo = mojoBuilder(spyS3Builder)
+                .withSource(FILE)
+                .withBucketName(BUCKET)
+                .withDestination(DESTINATION_KEY)
+                .withRegion(REGION)
+                .build();
+
+        mojo.execute();
+
+        assertEquals(
+                REGION,
+                spyS3Builder.getRegion(),
+                "The region was not applied."
         );
     }
 }

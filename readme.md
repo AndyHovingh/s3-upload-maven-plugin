@@ -2,6 +2,11 @@ s3-upload-maven-plugin
 ======================
 Uploads a file or (recursively) the contents of a directory to S3.
 
+Minimum Requirements
+------------------------
+Java Version: 7+
+Maven Version: 3.3.9+
+
 Configuration parameters
 ------------------------
 
@@ -28,7 +33,7 @@ Example: Upload a file
     <plugin>
       <groupId>com.bazaarvoice.maven.plugins</groupId>
       <artifactId>s3-upload-maven-plugin</artifactId>
-      <version>1.4</version>
+      <version>1.5.0</version>
       <configuration>
         <bucketName>my-s3-bucket</bucketName>
         <source>dir/filename.txt</source>
@@ -51,7 +56,7 @@ Example: Recursively upload a folder
     <plugin>
       <groupId>com.bazaarvoice.maven.plugins</groupId>
       <artifactId>s3-upload-maven-plugin</artifactId>
-      <version>1.4</version>
+      <version>1.5.0</version>
       <configuration>
         <bucketName>my-s3-bucket</bucketName>
         <source>dir</source>
@@ -66,10 +71,11 @@ Example: Recursively upload a folder
 Plugin Development
 ------------------------
 
-## Additional Dependencies
+## Minimum Development Requirements
 
-NOTE: [Docker](https://www.docker.com/) needs to be installed  in
-order to build the project, as it is used during integration testing.
+Java Version: 8+
+Maven Version: 3.6.2+
+[Docker](https://www.docker.com/) (used during integration testing)
 
 #### check dependencies are up-to-date
 

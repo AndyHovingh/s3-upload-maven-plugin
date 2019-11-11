@@ -16,6 +16,7 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.transfer.ObjectMetadataProvider;
 import com.amazonaws.services.s3.transfer.Transfer;
 import com.amazonaws.services.s3.transfer.TransferManager;
+import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
@@ -211,7 +212,7 @@ public class S3UploadMojo extends AbstractMojo
             endpoint
     );
 
-    if (!s3.doesBucketExist(bucketName)) {
+    if (!s3.doesBucketExistV2(bucketName)) {
       throw new MojoExecutionException("Bucket doesn't exist: " + bucketName);
     }
 
@@ -236,7 +237,8 @@ public class S3UploadMojo extends AbstractMojo
           final File sourceFile
   ) throws MojoExecutionException
   {
-    final TransferManager mgr = new TransferManager(s3);
+    final TransferManager mgr =
+            TransferManagerBuilder.standard().withS3Client(s3).build();
 
     final Transfer transfer;
     if (sourceFile.isFile()) {

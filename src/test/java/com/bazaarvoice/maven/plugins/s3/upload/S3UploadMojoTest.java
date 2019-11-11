@@ -38,7 +38,7 @@ public class S3UploadMojoTest
     {
         final AmazonS3 mockS3 = mock(AmazonS3.class);
 
-        when(mockS3.doesBucketExist(BUCKET)).thenReturn(true);
+        when(mockS3.doesBucketExistV2(BUCKET)).thenReturn(true);
 
         final PutObjectResult putObjectResult = new PutObjectResult();
         when(mockS3.putObject(any(PutObjectRequest.class))).thenReturn(putObjectResult);

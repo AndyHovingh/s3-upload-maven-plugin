@@ -15,10 +15,7 @@ import com.amazonaws.services.s3.Headers;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.transfer.ObjectMetadataProvider;
-import com.amazonaws.services.s3.transfer.Transfer;
-import com.amazonaws.services.s3.transfer.TransferManager;
-import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
+import com.amazonaws.services.s3.transfer.*;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
@@ -30,6 +27,8 @@ import java.io.File;
 @Mojo(name = "s3-upload")
 public class S3UploadMojo extends AbstractMojo
 {
+  private static final Long DELAY_BETWEEN_SHOW_UPDATES_MS = 250L;
+
   public static class S3Provider
   {
     private final AmazonS3ClientBuilder builder;
@@ -92,6 +91,7 @@ public class S3UploadMojo extends AbstractMojo
     private String profile;
     private boolean recursive;
     private S3Provider s3Provider;
+    private boolean showProgress = true;
     private Log log;
 
     public Builder withAccessKey(final String accessKey)
@@ -154,6 +154,12 @@ public class S3UploadMojo extends AbstractMojo
       return this;
     }
 
+    public Builder withShowProgress(final Boolean showProgress)
+    {
+      this.showProgress = showProgress;
+      return this;
+    }
+
     public Builder withLog(final Log log)
     {
       this.log = log;
@@ -188,6 +194,7 @@ public class S3UploadMojo extends AbstractMojo
     region = builder.region;
     profile = builder.profile;
     recursive = builder.recursive;
+    showProgress = builder.showProgress;
     setLog(builder.log);
     s3Provider = builder.s3Provider;
   }
@@ -234,6 +241,10 @@ public class S3UploadMojo extends AbstractMojo
   /** In the case of a directory upload, recursively upload the contents. */
   @Parameter(property = "s3-upload.recursive", defaultValue = "false")
   private boolean recursive;
+
+  /** To show upload detail/progress while upload is in progress */
+  @Parameter(property = "s3-upload.showProgress", defaultValue = "true")
+  private boolean showProgress;
 
   private S3Provider s3Provider = new S3Provider();
 
@@ -302,6 +313,12 @@ public class S3UploadMojo extends AbstractMojo
     }
     try {
       getLog().debug("Transferring " + transfer.getProgress().getTotalBytesToTransfer() + " bytes...");
+      if (showProgress) {
+        while (!transfer.isDone()) {
+          Thread.sleep(DELAY_BETWEEN_SHOW_UPDATES_MS);
+          TransferProgress progress = transfer.getProgress();
+        }
+      }
       transfer.waitForCompletion();
       getLog().info("Transferred " + transfer.getProgress().getBytesTransferred() + " bytes.");
     } catch (InterruptedException e) {
